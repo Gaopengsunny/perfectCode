@@ -223,7 +223,7 @@ function buildResult(items) {
         
         // 获取当前完整集合的幂集集合 
         var allSets = powerset(values)
-        console.log('allSets:',allSets);
+        // console.log('allSets:',allSets);
         // 每个组合的子集
         // allSets:[[],['红'],['大'],['A'],['红','大'],['红','A'],['大','A'],['红','大','A']]
         // key    : '', '红',  '大',  'A',   '红⊙大',   '红⊙A',   '大⊙A',   '红⊙大⊙A'
@@ -250,7 +250,7 @@ function buildResult(items) {
 
 // 掐头去尾留中间--'剪切'为我们想要的key，方便未来寻找res的key
 function trimSpliter(str, spliter) {
-    console.log('参数str==>',str);
+    // console.log('参数str==>',str);
     // 去除两边保留中间的⊙：构造 X⊙X⊙X    X⊙X   这种结构
     // ⊙abc⊙ => abc
     // ⊙a⊙⊙b⊙c⊙ => a⊙b⊙c
@@ -303,18 +303,21 @@ function updateStatus(selected) {
             
             copy[i] = item
             
-            // 获取'理想'的res中的key(例如：'红⊙A')
+            // 获取'理想'的res中的key(例如：'白⊙大⊙A')
             var curr = trimSpliter(copy.join(spliter), spliter)
 
-            var $item = $('dl').filter('[data-type="'+ key +'"]').find('[value="'+ item +'"]')
-
+            var $item = $('dl').filter('[data-type="'+ key +'"]').find('[value="'+ item +'"]') //<button>白</button>
+            console.log('当前元素：',$item,$item.get(0));
             // copy:['白','大','A']
             var titleStr = '['+ copy.join('-') +']'
-            console.log('titleStr',titleStr);
+            // console.log('titleStr',titleStr);
             if (res[curr]) {
+                // 设置当前元素为可选
                 $item.removeClass('disabled')
+                // 设置当前元素的title提示
                 setTitle($item.get(0))
             } else {
+                // 若不可选，则置灰且设置当前元素的title提示
                 $item.addClass('disabled').attr('title', titleStr + ' 无此属性搭配')
             }
         }
@@ -440,8 +443,8 @@ function updateData() {
     init(data)
 }
 
-function setTitle(el) {
-    // console.log('xxxx',el);
+// 设置元素的title若可选：则title即为当前值；若不可选，则title提示：[蓝-大-A] 无此属性搭配
+function setTitle(el) {    
     var title = $(el).data('title');
     if (title) $(el).attr('title', title);
 }
@@ -484,6 +487,7 @@ function init(data) {
     
     // **<构建数据>***构建路径查询表结构
     buildResult(r.items)
+    // console.log(res);
 
     // 根据当前选中的属性组合去更新状态:seletedItem :['红','大','A']
     updateStatus(getSelectedItem())

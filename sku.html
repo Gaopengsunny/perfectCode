@@ -64,25 +64,34 @@
 <div id="msg"></div>
 
 <script>
-    // 原始数据
+
+// 原始数据
 var data = JSON.parse($('#data_area').val())
 
+// 路径查询表结构：key=>路径； values=>sku值
 var res = {}
 
 var spliter = '\u2299'
 
-// sku===库存属性值搭配；属性列表矩阵
+// sku===库存属性值搭配；属性列表矩阵===》构建出了原始数据和视图数据
 var r = {}
 
-// 属性值数组['颜色','尺码','型号']
+// 属性值数组['颜色','尺码','型号'] 或者成为维度
 var keys = []
 
 // 选中属性值得缓存数组
 var selectedCache = []
 
 /**
- * 计算组合数据：1：抽离sku对应的属性搭配；2:抽离属性维度
+ * 计算组合数据：1：抽离sku对应的属性搭配items；2:抽离属性维度result
+ * 
  */
+/**
+ * @description: A:重构数据源 B:构造视图数据
+ * @param {data:sku数据源,keys:属性数组}
+ * @return {新对象=>由A和B组成}
+ */
+
 function combineAttr(data, keys) {
     // 干了啥？
     // 1.sku--规格搭配
@@ -100,7 +109,7 @@ function combineAttr(data, keys) {
         var item = data[i]
         var values = []
         
-        // keys: ["颜色", "尺码", "型号"]
+        // keys: ["颜色", "尺码", "型号"]；result是为了构造视图数据，
         for (var j = 0; j < keys.length; j++) {
             var key = keys[j]
             if (!result[key]) result[key] = [] //{'颜色':[],'尺码':[]}
@@ -118,6 +127,8 @@ function combineAttr(data, keys) {
         result: result,
         items: allKeys
     }
+
+    ;
 }
 
 /**
@@ -147,12 +158,10 @@ function render(data) {
     $('#app').html(output)
 }
 
-/* 获取所有属性值搭配--数组 */
-function getAllKeys(arr) {
-    
+/* 获取完整集合对应的数组 */
+function getAllKeys(arr) {    
     var result = []
-    for (var i = 0; i < arr.length; i++) { result.push(arr[i].path) }
-    console.log('push-path:',result);
+    for (var i = 0; i < arr.length; i++) { result.push(arr[i].path) }    
     return result
     
 }
@@ -181,6 +190,7 @@ function getAllKeys(arr) {
                       ps = [[], [1], [2], [1,2], [3], [1, 3], [2, 3], [1, 2, 3]]
  */
 function powerset(arr) {
+    //['红','大','A']
     var ps = [[]];
     for (var i=0; i < arr.length; i++) {
         for (var j = 0, len = ps.length; j < len; j++) {
@@ -189,26 +199,44 @@ function powerset(arr) {
     }
     return ps;
 }
+
 /**
- * 生成所有子集是否可选、库存状态 map
+ * 生成所有子集是否可选、库存状态 map(拆分幂集，构建路径查询结构表)
  */
 function buildResult(items) {
-    // ["红⊙大⊙A", "白⊙大⊙A", "白⊙中⊙B", "蓝⊙小⊙C"]
+    // 完整路径的集合数组： ["红⊙大⊙A", "白⊙大⊙A", "白⊙中⊙B", "蓝⊙小⊙C"] 
     var allKeys = getAllKeys(items)
-
+    
+    /**
+     * @description: 1.外层循环完整集合拆分出由完整路径构成的幂集数组2.内层循环当前外层循环拆分出的幂集，并构建路径查询表结构
+     * [
+     *  {path: "红⊙大⊙A", sku: "3158055"},
+     *  {path: "白⊙大⊙A", sku: "3158054"},
+     *  {path: "白⊙中⊙B", sku: "3133859"},
+     *  {path: "蓝⊙小⊙C", sku: "3516833"}
+     * ]
+     */
     for (var i = 0; i < allKeys.length; i++) {
-        var curr = allKeys[i]
-        var sku = items[i].sku
-        var values = curr.split(spliter)
-
-        // var allSets = getAllSets(values)
+        var curr = allKeys[i] //'红⊙大⊙A'
+        var sku = items[i].sku// sku值
+        var values = curr.split(spliter) // ['红','大','A']
+        
+        // 获取当前完整集合的幂集集合 
         var allSets = powerset(values)
-        console.log(allSets);
+        console.log('allSets:',allSets);
         // 每个组合的子集
+        // allSets:[[],['红'],['大'],['A'],['红','大'],['红','A'],['大','A'],['红','大','A']]
+        // key    : '', '红',  '大',  'A',   '红⊙大',   '红⊙A',   '大⊙A',   '红⊙大⊙A'
         for (var j = 0; j < allSets.length; j++) {
+            // 命名res的key
             var set = allSets[j]
-            var key = set.join(spliter)
-            console.log('key:::',key);
+            var key = set.join(spliter)            
+            /**
+             * res:{
+             *  '':['3158055'],
+             *  '红':['3158055']
+             * }             
+             */
             if (res[key]) {
                 res[key].skus.push(sku)
             } else {
@@ -220,7 +248,10 @@ function buildResult(items) {
     }
 }
 
+// 掐头去尾留中间--'剪切'为我们想要的key，方便未来寻找res的key
 function trimSpliter(str, spliter) {
+    console.log('参数str==>',str);
+    // 去除两边保留中间的⊙：构造 X⊙X⊙X    X⊙X   这种结构
     // ⊙abc⊙ => abc
     // ⊙a⊙⊙b⊙c⊙ => a⊙b⊙c
     var reLeft        = new RegExp('^' + spliter + '+', 'g');
@@ -235,16 +266,17 @@ function trimSpliter(str, spliter) {
  * 获取当前选中的属性
  */
 function getSelectedItem() {
+    // 该选中数组的特点是：['','中',''] 或者 ['','','C']..........
     var result = []
     $('dl[data-type]').each(function () {
         var $selected = $(this).find('.active')
+        
         if ($selected.length) {
             result.push($selected.val())
         } else {
             result.push('')
         }
-    })
-
+    })    
     return result
 }
 
@@ -252,22 +284,33 @@ function getSelectedItem() {
  * 更新所有属性状态
  */
 function updateStatus(selected) {
+    console.log('selected',selected);
+    // keys: ['颜色','尺码','型号']
+    // 外层循环属性，内层循环属性值(循环视图数据中的每个值)
     for (var i = 0; i < keys.length; i++) {
-        var key = keys[i];
-        var data = r.result[key]
-        var hasActive = !!selected[i]
-        var copy = selected.slice()
-
+        var key = keys[i];            //'颜色'
+        
+        var data = r.result[key]      //['红', '白', '蓝']
+       
+        var hasActive = !!selected[i] //['红','大','A']
+        
+        var copy = selected.slice()   //拷贝一份选中的数据['红','大','A']
+        
         for (var j = 0; j < data.length; j++) {
-            var item = data[j]
+            var item = data[j] 
+           
             if (selected[i] == item) continue
+            
             copy[i] = item
-
+            
+            // 获取'理想'的res中的key(例如：'红⊙A')
             var curr = trimSpliter(copy.join(spliter), spliter)
+
             var $item = $('dl').filter('[data-type="'+ key +'"]').find('[value="'+ item +'"]')
 
+            // copy:['白','大','A']
             var titleStr = '['+ copy.join('-') +']'
-
+            console.log('titleStr',titleStr);
             if (res[curr]) {
                 $item.removeClass('disabled')
                 setTitle($item.get(0))
@@ -398,7 +441,7 @@ function updateData() {
 }
 
 function setTitle(el) {
-    console.log('xxxx',el);
+    // console.log('xxxx',el);
     var title = $(el).data('title');
     if (title) $(el).attr('title', title);
 }
@@ -409,16 +452,20 @@ function setAllTitle() {
     // console.log($('#app').find('button'));
 }
 
+
+/** 初始化数据
+ * @description: 1.根据数据源生成新的原始数据和视图数据；2.渲染DOM
+ * @param {*} data
+ * @return {*}
+ */
 function init(data) {
-    // 初始化 干了啥？
-    // 1.生成属性数组keys:["颜色", "尺码", "型号"]
-    // 2.生成sku---属性值搭配；属性列表
+    
     res = {}
     r = {}
     keys = []
     selectedCache = []
     
-    // { "颜色": "红", "尺码": "大", "型号": "A", "skuId": "3158055" },
+    // { "颜色": "红", "尺码": "大", "型号": "A", "skuId": "3158055" }
     for (var attr_key in data[0]) {
         // 1.对象的非空判定
         if (!data[0].hasOwnProperty(attr_key)) continue;
@@ -428,13 +475,20 @@ function init(data) {
     // 暂无：button标签
     setAllTitle();
 
-    r = combineAttr(data, keys)
-    console.log(r)
+    // **<构建数据>***生成新的原始数据 和 视图数据
+    r = combineAttr(data, keys)    
+    console.log('r',r);
+    
+    // 渲染DOM(r.result视图数据)
     render(r.result)
-
+    
+    // **<构建数据>***构建路径查询表结构
     buildResult(r.items)
 
+    // 根据当前选中的属性组合去更新状态:seletedItem :['红','大','A']
     updateStatus(getSelectedItem())
+
+
     showResult()
 
     bindEvent()
